@@ -2298,10 +2298,10 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	else
 		nextTbtt = bs->bs_nexttbtt;
 
-	ath_dbg(common, BEACON, "next DTIM %d\n", bs->bs_nextdtim);
-	ath_dbg(common, BEACON, "next beacon %d\n", nextTbtt);
-	ath_dbg(common, BEACON, "beacon period %d\n", beaconintval);
-	ath_dbg(common, BEACON, "DTIM period %d\n", dtimperiod);
+	ath_dbg_common(common, BEACON, "next DTIM %d\n", bs->bs_nextdtim);
+	ath_dbg_common(common, BEACON, "next beacon %d\n", nextTbtt);
+	ath_dbg_common(common, BEACON, "beacon period %d\n", beaconintval);
+	ath_dbg_common(common, BEACON, "DTIM period %d\n", dtimperiod);
 
 	ENABLE_REGWRITE_BUFFER(ah);
 
