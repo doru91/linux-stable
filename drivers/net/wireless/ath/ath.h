@@ -296,6 +296,11 @@ do {									\
 		ath_printk(KERN_DEBUG, common, fmt, ##__VA_ARGS__);	\
 } while (0)
 
+#define ath_dbg_common(common, dbg_mask, fmt, ...)			\
+do {									\
+		ath_printk(KERN_DEBUG, common, fmt, ##__VA_ARGS__);	\
+} while (0)
+
 #define ATH_DBG_WARN(foo, arg...) WARN(foo, arg)
 #define ATH_DBG_WARN_ON_ONCE(foo) WARN_ON_ONCE(foo)
 
