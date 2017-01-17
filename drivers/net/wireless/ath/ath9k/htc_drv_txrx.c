@@ -1081,8 +1081,17 @@ void ath9k_rx_tasklet(unsigned long data)
 		skb = rxbuf->skb;
 		hdr = (struct ieee80211_hdr *) skb->data;
 
-		if (ieee80211_is_beacon(hdr->frame_control) && priv->ps_enabled)
-				ieee80211_queue_work(priv->hw, &priv->ps_work);
+		if (!priv->ps_enabled)
+			printk(KERN_INFO "!!! %s: !priv->ps_enabled \n", __func__);
+
+		if (ieee80211_is_beacon(hdr->frame_control) && priv->ps_enabled) {
+			printk(KERN_INFO "!!! %s: beacon frame: queue ps_work \n", __func__);
+			ieee80211_queue_work(priv->hw, &priv->ps_work);
+		}
+
+		if (!ieee80211_is_beacon(hdr->frame_control)) {
+			printk(KERN_INFO "!!! %s: not becon frame \n", __func__);
+		}
 
 		spin_unlock_irqrestore(&priv->rx.rxbuflock, flags);
 

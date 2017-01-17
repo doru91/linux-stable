@@ -1414,6 +1414,8 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 {
 	struct ieee80211_conf *conf = &local->hw.conf;
 
+	printk(KERN_INFO "!!! %s\n", __func__);
+
 	/*
 	 * If we are scanning right now then the parameters will
 	 * take effect when scan finishes.
@@ -1423,16 +1425,22 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 
 	if (conf->dynamic_ps_timeout > 0 &&
 	    !ieee80211_hw_check(&local->hw, SUPPORTS_DYNAMIC_PS)) {
+		printk(KERN_INFO "!!! %s: hardare supports DYNAMIC_PS \n", __func__);
 		mod_timer(&local->dynamic_ps_timer, jiffies +
 			  msecs_to_jiffies(conf->dynamic_ps_timeout));
 	} else {
-		if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK))
+		if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK)) {
+			printk(KERN_INFO "!!! %s: send NULL function \n, PS=1", __func__);
 			ieee80211_send_nullfunc(local, sdata, 1);
+		}
 
 		if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK) &&
-		    ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS))
+		    ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS)) {
+			printk(KERN_INFO "!!! %s: hardware supports PS_NULLFUNC_STACK and REPORTS_TX_ACK_STATUS \n", __func__);
 			return;
+		}
 
+		printk(KERN_INFO "!!! %s: enable PS and announce the driver \n", __func__);
 		conf->flags |= IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 	}
@@ -1441,10 +1449,12 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 static void ieee80211_change_ps(struct ieee80211_local *local)
 {
 	struct ieee80211_conf *conf = &local->hw.conf;
+	printk(KERN_INFO "!!! %s\n", __func__);
 
 	if (local->ps_sdata) {
 		ieee80211_enable_ps(local, local->ps_sdata);
 	} else if (conf->flags & IEEE80211_CONF_PS) {
+		printk(KERN_INFO "!!! %s: disable PS and notify driver\n", __func__);
 		conf->flags &= ~IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 		del_timer_sync(&local->dynamic_ps_timer);
@@ -1488,6 +1498,8 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 	struct ieee80211_sub_if_data *sdata, *found = NULL;
 	int count = 0;
 	int timeout;
+
+	printk(KERN_INFO "!!! %s\n", __func__);
 
 	if (!ieee80211_hw_check(&local->hw, SUPPORTS_PS)) {
 		local->ps_sdata = NULL;
@@ -1564,8 +1576,10 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 void ieee80211_recalc_ps_vif(struct ieee80211_sub_if_data *sdata)
 {
 	bool ps_allowed = ieee80211_powersave_allowed(sdata);
+	printk(KERN_INFO "!!! %s\n", __func__);
 
 	if (sdata->vif.bss_conf.ps != ps_allowed) {
+		printk(KERN_INFO "!!! %s. NOtify Driver to enable PS  \n", __func__);
 		sdata->vif.bss_conf.ps = ps_allowed;
 		ieee80211_bss_info_change_notify(sdata, BSS_CHANGED_PS);
 	}
@@ -1578,10 +1592,12 @@ void ieee80211_dynamic_ps_disable_work(struct work_struct *work)
 			     dynamic_ps_disable_work);
 
 	if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+		printk(KERN_INFO "!!! %s: disable PS\n", __func__);
 		local->hw.conf.flags &= ~IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 	}
 
+	printk(KERN_INFO "!!! %s: wake queues that are sleeping for PS reason \n", __func__);
 	ieee80211_wake_queues_by_reason(&local->hw,
 					IEEE80211_MAX_QUEUE_MAP,
 					IEEE80211_QUEUE_STOP_REASON_PS,
@@ -1598,6 +1614,8 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	unsigned long flags;
 	int q;
 
+	printk(KERN_INFO "!!! %s\n", __func__);
+
 	/* can only happen when PS was just disabled anyway */
 	if (!sdata)
 		return;
@@ -1610,6 +1628,7 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	if (local->hw.conf.dynamic_ps_timeout > 0) {
 		/* don't enter PS if TX frames are pending */
 		if (drv_tx_frames_pending(local)) {
+			printk(KERN_INFO "!!! %s: pending frames to transmit, postpone PS\n", __func__);
 			mod_timer(&local->dynamic_ps_timer, jiffies +
 				  msecs_to_jiffies(
 				  local->hw.conf.dynamic_ps_timeout));
@@ -1626,6 +1645,7 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 			if (local->queue_stop_reasons[q]) {
 				spin_unlock_irqrestore(&local->queue_stop_reason_lock,
 						       flags);
+				printk(KERN_INFO "!!! %s: queue is stopped. Postpone PS\n", __func__);
 				mod_timer(&local->dynamic_ps_timer, jiffies +
 					  msecs_to_jiffies(
 					  local->hw.conf.dynamic_ps_timeout));
@@ -1638,10 +1658,12 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK) &&
 	    !(ifmgd->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
 		if (drv_tx_frames_pending(local)) {
+			printk(KERN_INFO "!!! %s: postpone sending of the NULL function\n", __func__);
 			mod_timer(&local->dynamic_ps_timer, jiffies +
 				  msecs_to_jiffies(
 				  local->hw.conf.dynamic_ps_timeout));
 		} else {
+			printk(KERN_INFO "!!! %s: send NULL function with PS=1\n", __func__);
 			ieee80211_send_nullfunc(local, sdata, 1);
 			/* Flush to get the tx status of nullfunc frame */
 			ieee80211_flush_queues(local, sdata, false);
@@ -1651,6 +1673,7 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	if (!(ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS) &&
 	      ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK)) ||
 	    (ifmgd->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+		printk(KERN_INFO "!!! %s: unset STA_NULLFUNC_ACKED and enable PS\n", __func__);
 		ifmgd->flags &= ~IEEE80211_STA_NULLFUNC_ACKED;
 		local->hw.conf.flags |= IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
@@ -3317,6 +3340,8 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	u8 *bssid;
 	u8 deauth_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
+	printk(KERN_INFO "!!! %s\n", __func__);
+
 	sdata_assert_lock(sdata);
 
 	/* Process beacon from the current BSS */
@@ -3461,14 +3486,19 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 							elems.tim_len,
 							ifmgd->aid);
 		if (directed_tim) {
+			printk(KERN_INFO "!!! %s: directed tim\n", __func__);
 			if (local->hw.conf.dynamic_ps_timeout > 0) {
+				printk(KERN_INFO "!!! %s: awake the wifi card \n", __func__);
 				if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+					printk(KERN_INFO "!!! %s: awake the wifi card \n", __func__);
 					local->hw.conf.flags &= ~IEEE80211_CONF_PS;
 					ieee80211_hw_config(local,
 							    IEEE80211_CONF_CHANGE_PS);
 				}
+				printk(KERN_INFO "!!! %s: send NULL function with PS=0 \n", __func__);
 				ieee80211_send_nullfunc(local, sdata, 0);
 			} else if (!local->pspolling && sdata->u.mgd.powersave) {
+				printk(KERN_INFO "!!! %s: !!!!!!!!\n", __func__);
 				local->pspolling = true;
 
 				/*
@@ -3539,6 +3569,7 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	/* trigger hardware timers adjustment
 	 * this needs to be done before beacon filtering
 	 */
+	printk(KERN_INFO "!!! %s: notify driver for adjusting beacon timers \n", __func__);
 	changed |= BSS_CHANGED_BEACON_INFO;
 	ieee80211_bss_info_change_notify(sdata, changed);
 

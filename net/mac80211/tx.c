@@ -258,6 +258,7 @@ ieee80211_tx_h_dynamic_ps(struct ieee80211_tx_data *tx)
 		return TX_CONTINUE;
 
 	if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+		printk(KERN_INFO "!!! %s: stop queues with reason PS, unset NULLFUNC_ACKED, queue ps_disable_work\n", __func__);
 		ieee80211_stop_queues_by_reason(&local->hw,
 						IEEE80211_MAX_QUEUE_MAP,
 						IEEE80211_QUEUE_STOP_REASON_PS,
@@ -265,12 +266,14 @@ ieee80211_tx_h_dynamic_ps(struct ieee80211_tx_data *tx)
 		ifmgd->flags &= ~IEEE80211_STA_NULLFUNC_ACKED;
 		ieee80211_queue_work(&local->hw,
 				     &local->dynamic_ps_disable_work);
-	}
+	} else
+	printk(KERN_INFO "!!! %s: IEEE80211_CONF_PS unset\n", __func__);
 
 	/* Don't restart the timer if we're not disassociated */
 	if (!ifmgd->associated)
 		return TX_CONTINUE;
 
+	printk(KERN_INFO "!!! %s: mod timer the dynamic_ps_timer\n", __func__);
 	mod_timer(&local->dynamic_ps_timer, jiffies +
 		  msecs_to_jiffies(local->hw.conf.dynamic_ps_timeout));
 
@@ -3037,6 +3040,8 @@ void ieee80211_tx_pending(unsigned long data)
 	unsigned long flags;
 	int i;
 	bool txok;
+
+	printk(KERN_INFO "!!! %s:\n", __func__);
 
 	rcu_read_lock();
 

@@ -2434,6 +2434,7 @@ ieee80211_rx_h_data(struct ieee80211_rx_data *rx)
 		    ((struct ethhdr *)rx->skb->data)->h_dest) &&
 	    (!local->scanning &&
 	     !test_bit(SDATA_STATE_OFFCHANNEL, &sdata->state))) {
+			printk(KERN_INFO "!!! %s: mod timer dynamic_ps_timer\n", __func__);
 			mod_timer(&local->dynamic_ps_timer, jiffies +
 			 msecs_to_jiffies(local->hw.conf.dynamic_ps_timeout));
 	}

@@ -2186,17 +2186,23 @@ bool ath9k_hw_setpower(struct ath_hw *ah, enum ath9k_power_mode mode)
 		"UNDEFINED"
 	};
 
-	if (ah->power_mode == mode)
+	dump_stack();
+
+	if (ah->power_mode == mode) {
+		printk(KERN_INFO "!!! %s: already in that PS mode: %s \n", __func__, modes[mode]);
 		return status;
+	}
 
 	ath_dbg(common, RESET, "%s -> %s\n",
 		modes[ah->power_mode], modes[mode]);
 
 	switch (mode) {
 	case ATH9K_PM_AWAKE:
+		printk(KERN_INFO "!!! %s: AWAKE\n", __func__);
 		status = ath9k_hw_set_power_awake(ah);
 		break;
 	case ATH9K_PM_FULL_SLEEP:
+		printk(KERN_INFO "!!! %s: FULL SLEEP \n", __func__);
 		if (ath9k_hw_mci_is_enabled(ah))
 			ar9003_mci_set_full_sleep(ah);
 
@@ -2204,9 +2210,11 @@ bool ath9k_hw_setpower(struct ath_hw *ah, enum ath9k_power_mode mode)
 		ah->chip_fullsleep = true;
 		break;
 	case ATH9K_PM_NETWORK_SLEEP:
+		printk(KERN_INFO "!!! %s: NETWORK_SLEEP\n", __func__);
 		ath9k_set_power_network_sleep(ah);
 		break;
 	default:
+		printk(KERN_INFO "!!! %s: Unknown power mode\n", __func__);
 		ath_err(common, "Unknown power mode %u\n", mode);
 		return false;
 	}

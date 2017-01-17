@@ -44,12 +44,16 @@ bool ath9k_htc_setpower(struct ath9k_htc_priv *priv,
 
 void ath9k_htc_ps_wakeup(struct ath9k_htc_priv *priv)
 {
-	mutex_lock(&priv->htc_pm_lock);
-	if (++priv->ps_usecount != 1)
+	printk(KERN_INFO "!!! %s\n", __func__);
+
+	if (++priv->ps_usecount != 1) {
+		printk(KERN_INFO "!!! %s: goto unlock\n", __func__);
 		goto unlock;
+	}
 	ath9k_hw_setpower(priv->ah, ATH9K_PM_AWAKE);
 
 unlock:
+	printk(KERN_INFO "!!! %s: %lu\n", __func__, priv->ps_usecount);
 	mutex_unlock(&priv->htc_pm_lock);
 }
 
@@ -58,18 +62,23 @@ void ath9k_htc_ps_restore(struct ath9k_htc_priv *priv)
 	bool reset;
 
 	mutex_lock(&priv->htc_pm_lock);
-	if (--priv->ps_usecount != 0)
+	if (--priv->ps_usecount != 0) {
+		printk(KERN_INFO "!!! %s: goto unlock\n", __func__);
 		goto unlock;
+	}
 
 	if (priv->ps_idle) {
+		printk(KERN_INFO "!!! %s: FULL_SLEEP\n", __func__);
 		ath9k_hw_setrxabort(priv->ah, true);
 		ath9k_hw_stopdmarecv(priv->ah, &reset);
 		ath9k_hw_setpower(priv->ah, ATH9K_PM_FULL_SLEEP);
 	} else if (priv->ps_enabled) {
+		printk(KERN_INFO "!!! %s: NETWORK_SLEEP \n", __func__);
 		ath9k_hw_setpower(priv->ah, ATH9K_PM_NETWORK_SLEEP);
 	}
 
 unlock:
+	printk(KERN_INFO "!!! %s: %lu\n", __func__, priv->ps_usecount);
 	mutex_unlock(&priv->htc_pm_lock);
 }
 
@@ -1519,6 +1528,7 @@ static void ath9k_htc_bss_info_changed(struct ieee80211_hw *hw,
 	int slottime;
 
 	mutex_lock(&priv->mutex);
+	printk(KERN_INFO "!!! %s: PS_wakeup\n", __func__);
 	ath9k_htc_ps_wakeup(priv);
 
 	/* adjust beacon timers */
@@ -1616,7 +1626,10 @@ static void ath9k_htc_bss_info_changed(struct ieee80211_hw *hw,
 	if (changed & BSS_CHANGED_HT)
 		ath9k_htc_update_rate(priv, vif, bss_conf);
 
+	printk(KERN_INFO "!!! %s: ps_restore: NETWORK_SLEEP \n", __func__);
 	ath9k_htc_ps_restore(priv);
+	printk(KERN_INFO "---------------------------------\n");
+
 	mutex_unlock(&priv->mutex);
 }
 
