@@ -2423,37 +2423,82 @@ int __ieee80211_request_smps_mgd(struct ieee80211_sub_if_data *sdata,
 	return err;
 }
 
+
+/* When the user sets 'iw wlanX set power_save on/off' on a managed interface
+ * PS will be enabled/disabled on all the available interfaces.
+ */
 static int ieee80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 				    bool enabled, int timeout)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
+	struct ieee80211_sub_if_data *sdata1, *sdata2, *stemp;
+	int count = 0;
 
+	sdata1 = sdata2 = NULL;
+
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
+	/* save maximum two interfaces in managed mode */
+	list_for_each_entry(stemp, &local->interfaces, list) {
+		if (!ieee80211_sdata_running(stemp))
+			continue;
+
+		if (stemp->vif.type != NL80211_IFTYPE_STATION)
+			continue;
+
+		if (!count)
+			sdata1 = stemp;
+		else if (count == 1)
+			sdata2 = stemp;
+
+		count++;
+	}
+
+	/* PS can be enabled just for managed interfaces */
 	if (sdata->vif.type != NL80211_IFTYPE_STATION)
+		return -EOPNOTSUPP;
+
+	/* at this moment we support only 2 interfaces */
+	if (count > 2)
 		return -EOPNOTSUPP;
 
 	if (!ieee80211_hw_check(&local->hw, SUPPORTS_PS))
 		return -EOPNOTSUPP;
 
-	if (enabled == sdata->u.mgd.powersave &&
-	    timeout == local->dynamic_ps_forced_timeout)
+	if ((sdata1 && enabled == sdata1->u.mgd.powersave &&
+	    timeout == local->dynamic_ps_forced_timeout) ||
+	    (sdata2 && enabled == sdata2->u.mgd.powersave &&
+	    timeout == local->dynamic_ps_forced_timeout))
 		return 0;
 
-	sdata->u.mgd.powersave = enabled;
+	sdata1->u.mgd.powersave = enabled;
 	local->dynamic_ps_forced_timeout = timeout;
 
 	/* no change, but if automatic follow powersave */
-	sdata_lock(sdata);
-	__ieee80211_request_smps_mgd(sdata, sdata->u.mgd.req_smps);
-	sdata_unlock(sdata);
+	sdata_lock(sdata1);
+	__ieee80211_request_smps_mgd(sdata1, sdata1->u.mgd.req_smps);
+	sdata_unlock(sdata1);
+
+	/* TODO:
+	 * - read the specification for SMPS
+	 * - check the locking scheme
+	 */
+	if (sdata2) {
+		sdata2->u.mgd.powersave = enabled;
+		sdata_lock(sdata2);
+		__ieee80211_request_smps_mgd(sdata2, sdata2->u.mgd.req_smps);
+		sdata_unlock(sdata2);
+	}
 
 	if (ieee80211_hw_check(&local->hw, SUPPORTS_DYNAMIC_PS))
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 
 	ieee80211_recalc_ps(local, -1);
-	ieee80211_recalc_ps_vif(sdata);
+	ieee80211_recalc_ps_vif(sdata1);
+	if (sdata2)
+		ieee80211_recalc_ps_vif(sdata2);
 
 	return 0;
 }

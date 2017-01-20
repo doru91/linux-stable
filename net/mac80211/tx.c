@@ -226,7 +226,7 @@ ieee80211_tx_h_dynamic_ps(struct ieee80211_tx_data *tx)
 	if (local->scanning)
 		return TX_CONTINUE;
 
-	if (!local->ps_sdata)
+	if (!local->ps_sdata1 && !local->ps_sdata2)
 		return TX_CONTINUE;
 
 	/* No point if we're going to suspend */
@@ -258,7 +258,10 @@ ieee80211_tx_h_dynamic_ps(struct ieee80211_tx_data *tx)
 		return TX_CONTINUE;
 
 	if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+
+		/* debug info */
 		printk(KERN_INFO "!!! %s: stop queues with reason PS, unset NULLFUNC_ACKED, queue ps_disable_work\n", __func__);
+
 		ieee80211_stop_queues_by_reason(&local->hw,
 						IEEE80211_MAX_QUEUE_MAP,
 						IEEE80211_QUEUE_STOP_REASON_PS,

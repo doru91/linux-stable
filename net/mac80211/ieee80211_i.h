@@ -1303,11 +1303,11 @@ struct ieee80211_local {
 
 	bool pspolling;
 	bool offchannel_ps_enabled;
-	/*
-	 * PS can only be enabled when we have exactly one managed
-	 * interface (and monitors) in PS, this then points there.
+
+	/* A maximum of 2 managed interfaces can be used in PS mode
+	 * TODO: use a list with interfaces that can be used in PS
 	 */
-	struct ieee80211_sub_if_data *ps_sdata;
+	struct ieee80211_sub_if_data *ps_sdata1, *ps_sdata2;
 	struct work_struct dynamic_ps_enable_work;
 	struct work_struct dynamic_ps_disable_work;
 	struct timer_list dynamic_ps_timer;

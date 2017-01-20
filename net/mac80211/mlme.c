@@ -1409,11 +1409,11 @@ static u32 ieee80211_handle_pwr_constr(struct ieee80211_sub_if_data *sdata,
 }
 
 /* powersave */
-static void ieee80211_enable_ps(struct ieee80211_local *local,
-				struct ieee80211_sub_if_data *sdata)
+static void ieee80211_enable_ps(struct ieee80211_local *local)
 {
 	struct ieee80211_conf *conf = &local->hw.conf;
 
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
 	/*
@@ -1425,13 +1425,25 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 
 	if (conf->dynamic_ps_timeout > 0 &&
 	    !ieee80211_hw_check(&local->hw, SUPPORTS_DYNAMIC_PS)) {
+
+		/* debug info */
 		printk(KERN_INFO "!!! %s: hardare supports DYNAMIC_PS \n", __func__);
+
 		mod_timer(&local->dynamic_ps_timer, jiffies +
 			  msecs_to_jiffies(conf->dynamic_ps_timeout));
 	} else {
 		if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK)) {
-			printk(KERN_INFO "!!! %s: send NULL function \n, PS=1", __func__);
-			ieee80211_send_nullfunc(local, sdata, 1);
+
+			/* debug info */
+			if (local->ps_sdata1 && local->ps_sdata2)
+				printk(KERN_INFO "!!! %s: send NULL function (PS = 1), 2 interfaces\n", __func__);
+			else
+				printk(KERN_INFO "!!! %s: send NULL function (PS = 1), 1 interface\n", __func__);
+
+			if (local->ps_sdata1)
+				ieee80211_send_nullfunc(local, local->ps_sdata1, 1);
+			if (local->ps_sdata2)
+				ieee80211_send_nullfunc(local, local->ps_sdata2, 1);
 		}
 
 		if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK) &&
@@ -1440,7 +1452,9 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 			return;
 		}
 
+		/* debug info */
 		printk(KERN_INFO "!!! %s: enable PS and announce the driver \n", __func__);
+
 		conf->flags |= IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 	}
@@ -1449,12 +1463,17 @@ static void ieee80211_enable_ps(struct ieee80211_local *local,
 static void ieee80211_change_ps(struct ieee80211_local *local)
 {
 	struct ieee80211_conf *conf = &local->hw.conf;
+
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
-	if (local->ps_sdata) {
-		ieee80211_enable_ps(local, local->ps_sdata);
+	if (local->ps_sdata1 || local->ps_sdata2) {
+		ieee80211_enable_ps(local);
 	} else if (conf->flags & IEEE80211_CONF_PS) {
+
+		/* debug info */
 		printk(KERN_INFO "!!! %s: disable PS and notify driver\n", __func__);
+
 		conf->flags &= ~IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 		del_timer_sync(&local->dynamic_ps_timer);
@@ -1492,24 +1511,28 @@ static bool ieee80211_powersave_allowed(struct ieee80211_sub_if_data *sdata)
 	return authorized;
 }
 
-/* need to hold RTNL or interface lock */
+/* need to hold RTNL or interface lock
+ * TODO: Implement finer PS recalculation.
+ * At this moment the recalculation is done globally.
+ */
 void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 {
-	struct ieee80211_sub_if_data *sdata, *found = NULL;
-	int count = 0;
+	struct ieee80211_sub_if_data *sdata1, *sdata2, *stemp;
 	int timeout;
+	int count = 0;
 
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
-	if (!ieee80211_hw_check(&local->hw, SUPPORTS_PS)) {
-		local->ps_sdata = NULL;
-		return;
-	}
+	/* TODO: locking scheme for second interface */
+	sdata1 = sdata2 =  NULL;
 
-	list_for_each_entry(sdata, &local->interfaces, list) {
-		if (!ieee80211_sdata_running(sdata))
+	/* save maximum two interfaces in managed mode */
+	list_for_each_entry(stemp, &local->interfaces, list) {
+		if (!ieee80211_sdata_running(stemp))
 			continue;
-		if (sdata->vif.type == NL80211_IFTYPE_AP) {
+
+		if (stemp->vif.type == NL80211_IFTYPE_AP) {
 			/* If an AP vif is found, then disable PS
 			 * by setting the count to zero thereby setting
 			 * ps_sdata to NULL.
@@ -1517,20 +1540,35 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 			count = 0;
 			break;
 		}
-		if (sdata->vif.type != NL80211_IFTYPE_STATION)
+
+		if (stemp->vif.type != NL80211_IFTYPE_STATION)
 			continue;
-		found = sdata;
+
+		if (!count)
+			sdata1 = stemp;
+		else if (count == 1)
+			sdata2 = stemp;
+
 		count++;
 	}
 
-	if (count == 1 && ieee80211_powersave_allowed(found)) {
+	if (!count || !ieee80211_hw_check(&local->hw, SUPPORTS_PS)) {
+		local->ps_sdata1 = NULL;
+		local->ps_sdata2 = NULL;
+		return;
+	}
+
+	/* TODO: compute max_sleep_period and ps_dtim_period per interface
+	 * This values are not used by the ath9k_htc driver.
+	 */
+	if (ieee80211_powersave_allowed(sdata1)) {
 		s32 beaconint_us;
 
 		if (latency < 0)
 			latency = pm_qos_request(PM_QOS_NETWORK_LATENCY);
 
 		beaconint_us = ieee80211_tu_to_usec(
-					found->vif.bss_conf.beacon_int);
+					sdata1->vif.bss_conf.beacon_int);
 
 		timeout = local->dynamic_ps_forced_timeout;
 		if (timeout < 0) {
@@ -1550,10 +1588,12 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 		local->hw.conf.dynamic_ps_timeout = timeout;
 
 		if (beaconint_us > latency) {
-			local->ps_sdata = NULL;
+			local->ps_sdata1 = NULL;
+			if (count == 2)
+				local->ps_sdata2 = NULL;
 		} else {
 			int maxslp = 1;
-			u8 dtimper = found->u.mgd.dtim_period;
+			u8 dtimper = sdata1->u.mgd.dtim_period;
 
 			/* If the TIM IE is invalid, pretend the value is 1 */
 			if (!dtimper)
@@ -1564,22 +1604,33 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 
 			local->hw.conf.max_sleep_period = maxslp;
 			local->hw.conf.ps_dtim_period = dtimper;
-			local->ps_sdata = found;
+			local->ps_sdata1 = sdata1;
+			if (count == 2)
+				local->ps_sdata2 = sdata2;
+
 		}
 	} else {
-		local->ps_sdata = NULL;
+		local->ps_sdata1 = NULL;
+		local->ps_sdata2 = NULL;
 	}
 
 	ieee80211_change_ps(local);
 }
 
+
+/* TODO: at this moment the flag BSS_CHANGED_PS is not used by ath9k_htc driver */
 void ieee80211_recalc_ps_vif(struct ieee80211_sub_if_data *sdata)
 {
 	bool ps_allowed = ieee80211_powersave_allowed(sdata);
+
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
 	if (sdata->vif.bss_conf.ps != ps_allowed) {
+
+		/* debug info */
 		printk(KERN_INFO "!!! %s. NOtify Driver to enable PS  \n", __func__);
+
 		sdata->vif.bss_conf.ps = ps_allowed;
 		ieee80211_bss_info_change_notify(sdata, BSS_CHANGED_PS);
 	}
@@ -1609,18 +1660,26 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	struct ieee80211_local *local =
 		container_of(work, struct ieee80211_local,
 			     dynamic_ps_enable_work);
-	struct ieee80211_sub_if_data *sdata = local->ps_sdata;
-	struct ieee80211_if_managed *ifmgd;
+	struct ieee80211_if_managed *ifmgd1, *ifmgd2;
+	struct ieee80211_sub_if_data *sdata1, *sdata2;
 	unsigned long flags;
 	int q;
 
+	/* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
+	sdata1 = local->ps_sdata1;
+	sdata2 = local->ps_sdata2;
+	ifmgd1 = ifmgd2 = NULL;
+
 	/* can only happen when PS was just disabled anyway */
-	if (!sdata)
+	if (!sdata1 && !sdata2)
 		return;
 
-	ifmgd = &sdata->u.mgd;
+	if (sdata1)
+		ifmgd1 = &sdata1->u.mgd;
+	if (sdata2)
+		ifmgd2 = &sdata2->u.mgd;
 
 	if (local->hw.conf.flags & IEEE80211_CONF_PS)
 		return;
@@ -1628,7 +1687,10 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	if (local->hw.conf.dynamic_ps_timeout > 0) {
 		/* don't enter PS if TX frames are pending */
 		if (drv_tx_frames_pending(local)) {
-			printk(KERN_INFO "!!! %s: pending frames to transmit, postpone PS\n", __func__);
+
+			/* debug info */
+			printk(KERN_INFO "!!! %s: pending frames to transmit, postpone PS \n", __func__);
+
 			mod_timer(&local->dynamic_ps_timer, jiffies +
 				  msecs_to_jiffies(
 				  local->hw.conf.dynamic_ps_timeout));
@@ -1645,7 +1707,10 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 			if (local->queue_stop_reasons[q]) {
 				spin_unlock_irqrestore(&local->queue_stop_reason_lock,
 						       flags);
-				printk(KERN_INFO "!!! %s: queue is stopped. Postpone PS\n", __func__);
+
+				/* debug info */
+				printk(KERN_INFO "!!! %s: queue is stopped, postpone PS \n", __func__);
+
 				mod_timer(&local->dynamic_ps_timer, jiffies +
 					  msecs_to_jiffies(
 					  local->hw.conf.dynamic_ps_timeout));
@@ -1656,25 +1721,52 @@ void ieee80211_dynamic_ps_enable_work(struct work_struct *work)
 	}
 
 	if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK) &&
-	    !(ifmgd->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+	    (!(ifmgd1->flags & IEEE80211_STA_NULLFUNC_ACKED) ||
+	     (ifmgd2 && !(ifmgd2->flags & IEEE80211_STA_NULLFUNC_ACKED)))) {
 		if (drv_tx_frames_pending(local)) {
+
+			/* debug info */
 			printk(KERN_INFO "!!! %s: postpone sending of the NULL function\n", __func__);
+
 			mod_timer(&local->dynamic_ps_timer, jiffies +
 				  msecs_to_jiffies(
 				  local->hw.conf.dynamic_ps_timeout));
 		} else {
-			printk(KERN_INFO "!!! %s: send NULL function with PS=1\n", __func__);
-			ieee80211_send_nullfunc(local, sdata, 1);
-			/* Flush to get the tx status of nullfunc frame */
-			ieee80211_flush_queues(local, sdata, false);
+			if (!(ifmgd1->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+
+				/* debug info */
+				printk(KERN_INFO "!!! %s: send NULL function with PS=1, interface 1\n", __func__);
+
+				ieee80211_send_nullfunc(local, sdata1, 1);
+				/* Flush to get the tx status of nullfunc frame */
+				ieee80211_flush_queues(local, sdata1, false);
+			}
+
+			if (ifmgd2 && !(ifmgd2->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+
+				/* debug info */
+				printk(KERN_INFO "!!! %s: send NULL function with PS=1, interface 2\n", __func__);
+
+				ieee80211_send_nullfunc(local, sdata2, 1);
+				/* Flush to get the tx status of nullfunc frame */
+				ieee80211_flush_queues(local, sdata2, false);
+			}
 		}
 	}
 
 	if (!(ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS) &&
 	      ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK)) ||
-	    (ifmgd->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+	      (ifmgd1->flags & IEEE80211_STA_NULLFUNC_ACKED)) {
+		if (ifmgd2 && !(ifmgd2->flags & IEEE80211_STA_NULLFUNC_ACKED))
+			return;
+
+		/* debug info */
 		printk(KERN_INFO "!!! %s: unset STA_NULLFUNC_ACKED and enable PS\n", __func__);
-		ifmgd->flags &= ~IEEE80211_STA_NULLFUNC_ACKED;
+
+		ifmgd1->flags &= ~IEEE80211_STA_NULLFUNC_ACKED;
+		if (ifmgd2)
+			ifmgd2->flags &= ~IEEE80211_STA_NULLFUNC_ACKED;
+
 		local->hw.conf.flags |= IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 	}
@@ -2066,7 +2158,14 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 		local->hw.conf.flags &= ~IEEE80211_CONF_PS;
 		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
 	}
-	local->ps_sdata = NULL;
+
+	/* if one vif is disassociated, then PS is globally disabled.
+	 * TODO:
+	 * - locking scheme
+	 * - implement per vif PS disable
+	 */
+	local->ps_sdata1 = NULL;
+	local->ps_sdata2 = NULL;
 
 	/* disable per-vif ps */
 	ieee80211_recalc_ps_vif(sdata);
@@ -3340,6 +3439,7 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	u8 *bssid;
 	u8 deauth_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
+        /* debug info */
 	printk(KERN_INFO "!!! %s\n", __func__);
 
 	sdata_assert_lock(sdata);
@@ -3486,19 +3586,46 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 							elems.tim_len,
 							ifmgd->aid);
 		if (directed_tim) {
+
+			/* debug info */
 			printk(KERN_INFO "!!! %s: directed tim\n", __func__);
+
 			if (local->hw.conf.dynamic_ps_timeout > 0) {
+
+				/* debug info */
 				printk(KERN_INFO "!!! %s: awake the wifi card \n", __func__);
+
 				if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+
+					/* debug info */
 					printk(KERN_INFO "!!! %s: awake the wifi card \n", __func__);
+
 					local->hw.conf.flags &= ~IEEE80211_CONF_PS;
 					ieee80211_hw_config(local,
 							    IEEE80211_CONF_CHANGE_PS);
 				}
-				printk(KERN_INFO "!!! %s: send NULL function with PS=0 \n", __func__);
+
+				/* debug info */
+				printk(KERN_INFO "!!! %s: send NULL function with PS=0, interface 1 \n", __func__);
+
 				ieee80211_send_nullfunc(local, sdata, 0);
+
+				if (local->ps_sdata1 && local->ps_sdata2) {
+					/* debug info */
+					printk(KERN_INFO "!!! %s: send NULL function with PS=0, interface 2 \n", __func__);
+
+					if (!strcmp(sdata->name, local->ps_sdata1->name))
+						ieee80211_send_nullfunc(local, local->ps_sdata2, 0);
+					else if (!strcmp(sdata->name, local->ps_sdata2->name))
+						ieee80211_send_nullfunc(local, local->ps_sdata1, 0);
+					else
+						printk(KERN_INFO "!!! %s: something is wrong \n", __func__);
+				}
 			} else if (!local->pspolling && sdata->u.mgd.powersave) {
-				printk(KERN_INFO "!!! %s: !!!!!!!!\n", __func__);
+
+				/* debug info */
+				printk(KERN_INFO "!!! %s: pspoll \n", __func__);
+
 				local->pspolling = true;
 
 				/*
