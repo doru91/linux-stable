@@ -922,6 +922,10 @@ int ath9k_init_device(u16 devid, struct ath_softc *sc,
 		return error;
 
 	ah = sc->sc_ah;
+
+	printk(KERN_INFO "!!! %s\n", __func__);
+	ah->saved_next_dtim = 0;
+	ah->saved_next_tbtt = 0;
 	common = ath9k_hw_common(ah);
 	ath9k_set_hw_capab(sc, hw);
 

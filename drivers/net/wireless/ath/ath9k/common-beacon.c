@@ -38,10 +38,17 @@ static u32 ath9k_get_next_tbtt(struct ath_hw *ah, u64 tsf,
 {
 	unsigned int offset;
 
-	tsf += TU_TO_USEC(FUDGE + ah->config.sw_beacon_response_time);
+	/* sw_beacon_response_time is responsible for SWBA interrupt,
+	 * when beacons are generated in AP mode. At this moment, we
+	 * use this function for the STA use-case
+	 */
+	/* tsf += TU_TO_USEC(FUDGE + ah->config.sw_beacon_response_time); */
 	offset = ath9k_mod_tsf64_tu(tsf, interval);
 
-	return (u32) tsf + TU_TO_USEC(interval) - offset;
+	/* for the moment, skip modulo arithmetic for next tbtt and
+	 * use absolute values for the multi-WiFi scenario
+	 */
+	return (u32)tsf + TU_TO_USEC(interval) /*- offset*/;
 }
 
 /*
@@ -62,10 +69,12 @@ int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 
 	/* No need to configure beacon if we are not associated */
 	if (!test_bit(ATH_OP_PRIM_STA_VIF, &common->op_flags)) {
-		ath_dbg(common, BEACON,
+		ath_dbg_common(common, BEACON,
 			"STA is not yet associated..skipping beacon config\n");
 		return -EPERM;
 	}
+
+	printk(KERN_INFO "%s\n", __func__);
 
 	memset(bs, 0, sizeof(*bs));
 	conf->intval = conf->beacon_interval;
@@ -108,10 +117,11 @@ int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 	 * duration is greater than the DTIM period then it makes senses
 	 * to make it a multiple of that.
 	 *
-	 * XXX fixed at 100ms
+	 * XXX fixed at 200ms for the multi-WiFi scenario. Make sure that
+	 * DTIM count = 2 for both APs.
 	 */
 
-	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(100),
+	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(200),
 						  conf->intval));
 	if (bs->bs_sleepduration > bs->bs_dtimperiod)
 		bs->bs_sleepduration = bs->bs_dtimperiod;

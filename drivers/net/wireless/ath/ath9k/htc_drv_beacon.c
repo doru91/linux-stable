@@ -97,6 +97,7 @@ static void ath9k_htc_beacon_config_sta(struct ath9k_htc_priv *priv,
 	__be32 htc_imask = 0;
 	int ret __attribute__ ((unused));
 	u8 cmd_rsp;
+	printk(KERN_INFO "%s\n", __func__);
 
 	if (ath9k_cmn_beacon_config_sta(priv->ah, bss_conf, &bs) == -EPERM)
 		return;
@@ -409,7 +410,7 @@ static bool ath9k_htc_check_beacon_config(struct ath9k_htc_priv *priv,
 	    (priv->num_ap_vif > 1) &&
 	    (vif->type == NL80211_IFTYPE_AP) &&
 	    (cur_conf->beacon_interval != bss_conf->beacon_int)) {
-		ath_dbg(common, CONFIG,
+		ath_dbg_common(common, CONFIG,
 			"Changing beacon interval of multiple AP interfaces !\n");
 		return false;
 	}
@@ -420,7 +421,7 @@ static bool ath9k_htc_check_beacon_config(struct ath9k_htc_priv *priv,
 	 */
 	if (priv->num_ap_vif &&
 	    (vif->type != NL80211_IFTYPE_AP)) {
-		ath_dbg(common, CONFIG,
+		ath_dbg_common(common, CONFIG,
 			"HW in AP mode, cannot set STA beacon parameters\n");
 		return false;
 	}
@@ -437,11 +438,11 @@ static bool ath9k_htc_check_beacon_config(struct ath9k_htc_priv *priv,
 			priv->hw, IEEE80211_IFACE_ITER_RESUME_ALL,
 			ath9k_htc_beacon_iter, &beacon_configured);
 
-		if (beacon_configured) {
-			ath_dbg(common, CONFIG,
+		/*if (beacon_configured) {
+			ath_dbg_common(common, CONFIG,
 				"Beacon already configured for a station interface\n");
 			return false;
-		}
+		}*/
 	}
 
 	return true;
@@ -455,8 +456,10 @@ void ath9k_htc_beacon_config(struct ath9k_htc_priv *priv,
 	struct ieee80211_bss_conf *bss_conf = &vif->bss_conf;
 	struct ath9k_htc_vif *avp = (struct ath9k_htc_vif *) vif->drv_priv;
 
-	if (!ath9k_htc_check_beacon_config(priv, vif))
+	if (!ath9k_htc_check_beacon_config(priv, vif)) {
+		printk(KERN_INFO "!!! %s: return\n", __func__);
 		return;
+	}
 
 	cur_conf->beacon_interval = bss_conf->beacon_int;
 	if (cur_conf->beacon_interval == 0)

@@ -226,8 +226,12 @@ static inline void drv_bss_info_changed(struct ieee80211_local *local,
 		return;
 
 	trace_drv_bss_info_changed(local, sdata, info, changed);
-	if (local->ops->bss_info_changed)
+	if (local->ops->bss_info_changed) {
+		printk(KERN_INFO "%s: local->ops->bss_info_changed\n", __func__);
 		local->ops->bss_info_changed(&local->hw, &sdata->vif, info, changed);
+		printk(KERN_INFO "%s: local->ops->bss_info_changed end\n", __func__);
+
+	}
 	trace_drv_return_void(local);
 }
 

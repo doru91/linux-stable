@@ -1527,13 +1527,17 @@ static void ath9k_htc_bss_info_changed(struct ieee80211_hw *hw,
 	struct ath_common *common = ath9k_hw_common(ah);
 	int slottime;
 
+	printk(KERN_INFO "%s\n", __func__);
+
 	mutex_lock(&priv->mutex);
-	printk(KERN_INFO "!!! %s: PS_wakeup\n", __func__);
+	printk(KERN_INFO "%s: PS_wakeup\n", __func__);
 	ath9k_htc_ps_wakeup(priv);
 
 	/* adjust beacon timers */
-	if (changed && BSS_CHANGED_BEACON_INFO)
+	if (changed & BSS_UPDATE_TIMERS) {
+		printk(KERN_INFO "%s: BSS_UPDATE_TIMERS \n", __func__);
 		ath9k_htc_beacon_config(priv, vif);
+	}
 
 	if (changed & BSS_CHANGED_ASSOC) {
 		ath_dbg(common, CONFIG, "BSS Changed ASSOC %d\n",
@@ -1558,12 +1562,12 @@ static void ath9k_htc_bss_info_changed(struct ieee80211_hw *hw,
 		if (priv->ah->opmode == NL80211_IFTYPE_ADHOC) {
 			common->curaid = bss_conf->aid;
 			memcpy(common->curbssid, bss_conf->bssid, ETH_ALEN);
-			ath9k_htc_set_bssid(priv);
+
 		}
 	}
 
 	if ((changed & BSS_CHANGED_BEACON_ENABLED) && bss_conf->enable_beacon) {
-		ath_dbg(common, CONFIG, "Beacon enabled for BSS: %pM\n",
+		ath_dbg_common(common, CONFIG, "Beacon enabled for BSS: %pM\n",
 			bss_conf->bssid);
 		ath9k_htc_set_tsfadjust(priv, vif);
 		priv->cur_beacon_conf.enable_beacon = 1;
@@ -1626,7 +1630,7 @@ static void ath9k_htc_bss_info_changed(struct ieee80211_hw *hw,
 	if (changed & BSS_CHANGED_HT)
 		ath9k_htc_update_rate(priv, vif, bss_conf);
 
-	printk(KERN_INFO "!!! %s: ps_restore: NETWORK_SLEEP \n", __func__);
+	printk(KERN_INFO "!!! %s: ps_restore\n", __func__);
 	ath9k_htc_ps_restore(priv);
 	printk(KERN_INFO "---------------------------------\n");
 

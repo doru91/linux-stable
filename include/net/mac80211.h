@@ -322,6 +322,7 @@ enum ieee80211_bss_change {
 	BSS_CHANGED_BEACON_INFO		= 1<<20,
 	BSS_CHANGED_BANDWIDTH		= 1<<21,
 	BSS_CHANGED_OCB                 = 1<<22,
+	BSS_UPDATE_TIMERS		= 1<<23,
 
 	/* when adding here, make sure to change ieee80211_reconfig */
 };

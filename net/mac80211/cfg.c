@@ -2442,6 +2442,8 @@ static int ieee80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 
 	/* save maximum two interfaces in managed mode */
 	list_for_each_entry(stemp, &local->interfaces, list) {
+		printk(KERN_INFO "!!! %s: interface name: %s\n", __func__, stemp->name);
+
 		if (!ieee80211_sdata_running(stemp))
 			continue;
 

@@ -1427,7 +1427,7 @@ static void ieee80211_enable_ps(struct ieee80211_local *local)
 	    !ieee80211_hw_check(&local->hw, SUPPORTS_DYNAMIC_PS)) {
 
 		/* debug info */
-		printk(KERN_INFO "!!! %s: hardare supports DYNAMIC_PS \n", __func__);
+		printk(KERN_INFO "!!! %s: hardare does not support DYNAMIC_PS \n", __func__);
 
 		mod_timer(&local->dynamic_ps_timer, jiffies +
 			  msecs_to_jiffies(conf->dynamic_ps_timeout));
@@ -3440,24 +3440,28 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	u8 deauth_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
         /* debug info */
-	printk(KERN_INFO "!!! %s\n", __func__);
+	printk(KERN_INFO "%s\n", __func__);
 
 	sdata_assert_lock(sdata);
 
 	/* Process beacon from the current BSS */
 	baselen = (u8 *) mgmt->u.beacon.variable - (u8 *) mgmt;
-	if (baselen > len)
+	if (baselen > len) {
+		printk(KERN_INFO "%s :return 1\n", __func__);
 		return;
+	}
 
 	rcu_read_lock();
 	chanctx_conf = rcu_dereference(sdata->vif.chanctx_conf);
 	if (!chanctx_conf) {
 		rcu_read_unlock();
+		printk(KERN_INFO "%s :return 2\n", __func__);
 		return;
 	}
 
 	if (rx_status->freq != chanctx_conf->def.chan->center_freq) {
 		rcu_read_unlock();
+		printk(KERN_INFO "%s :return 3\n", __func__);
 		return;
 	}
 	chan = chanctx_conf->def.chan;
@@ -3490,13 +3494,20 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 		ifmgd->assoc_data->timeout = jiffies;
 		ifmgd->assoc_data->timeout_started = true;
 		run_again(sdata, ifmgd->assoc_data->timeout);
+		printk(KERN_INFO "!!! %s :return 4\n", __func__);
 		return;
 	}
 
 	if (!ifmgd->associated ||
-	    !ether_addr_equal(mgmt->bssid, ifmgd->associated->bssid))
+	    !ether_addr_equal(mgmt->bssid, ifmgd->associated->bssid)) {
+		printk(KERN_INFO "%s: NOT our bssid\n", __func__);
+		if (ifmgd->associated)
+			printk(KERN_INFO "!!!! %s: %pM, %pM\n", __func__, ifmgd->associated->bssid, mgmt->bssid);
 		return;
+	}
 	bssid = ifmgd->associated->bssid;
+
+	printk(KERN_INFO "%s: our bssid: %pM\n", __func__, bssid);
 
 	/* Track average RSSI from the Beacon frames of the current AP */
 	ifmgd->last_beacon_signal = rx_status->signal;
@@ -3696,9 +3707,12 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 	/* trigger hardware timers adjustment
 	 * this needs to be done before beacon filtering
 	 */
-	printk(KERN_INFO "!!! %s: notify driver for adjusting beacon timers \n", __func__);
-	changed |= BSS_CHANGED_BEACON_INFO;
-	ieee80211_bss_info_change_notify(sdata, changed);
+	if (local->ps_sdata1 && ieee80211_powersave_allowed(local->ps_sdata1)
+	    && local->ps_sdata2 && ieee80211_powersave_allowed(local->ps_sdata2)) {
+		printk(KERN_INFO "!!! %s: notify driver for adjusting beacon timers \n", __func__);
+		changed |= BSS_UPDATE_TIMERS;
+		ieee80211_bss_info_change_notify(sdata, changed);
+	}
 
 	if (ncrc == ifmgd->beacon_crc && ifmgd->beacon_crc_valid)
 		return;
@@ -3785,6 +3799,7 @@ void ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 	u16 fc;
 	struct ieee802_11_elems elems;
 	int ies_len;
+	struct ieee80211_hdr *hdr;
 
 	rx_status = (struct ieee80211_rx_status *) skb->cb;
 	mgmt = (struct ieee80211_mgmt *) skb->data;
@@ -3794,6 +3809,8 @@ void ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 
 	switch (fc & IEEE80211_FCTL_STYPE) {
 	case IEEE80211_STYPE_BEACON:
+		hdr = (struct ieee80211_hdr *)skb->data;
+		printk(KERN_INFO "!!! %s, seq: %d\n", __func__, hdr->seq_ctrl);
 		ieee80211_rx_mgmt_beacon(sdata, mgmt, skb->len, rx_status);
 		break;
 	case IEEE80211_STYPE_PROBE_RESP:

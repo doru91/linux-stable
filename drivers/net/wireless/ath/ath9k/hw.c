@@ -2090,6 +2090,7 @@ static void ath9k_set_power_network_sleep(struct ath_hw *ah)
 	REG_SET_BIT(ah, AR_STA_ID1, AR_STA_ID1_PWR_SAV);
 
 	if (!(pCap->hw_caps & ATH9K_HW_CAP_AUTOSLEEP)) {
+		printk(KERN_INFO "autosleep \n");
 		/* Set WakeOnInterrupt bit; clear ForceWake bit */
 		REG_WRITE(ah, AR_RTC_FORCE_WAKE,
 			  AR_RTC_FORCE_WAKE_ON_INT);
@@ -2111,6 +2112,7 @@ static void ath9k_set_power_network_sleep(struct ath_hw *ah)
 		 * Clear the RTC force wake bit to allow the
 		 * mac to go to sleep.
 		 */
+		printk(KERN_INFO "clear the RTC force wake bit\n");
 		REG_CLR_BIT(ah, AR_RTC_FORCE_WAKE, AR_RTC_FORCE_WAKE_EN);
 
 		if (ath9k_hw_mci_is_enabled(ah))
@@ -2145,6 +2147,7 @@ static bool ath9k_hw_set_power_awake(struct ath_hw *ah)
 		REG_SET_BIT(ah, AR_RTC_RESET,
 			    AR_RTC_RESET_EN);
 
+	printk(KERN_INFO "set bit FORCE_WAKE \n");
 	REG_SET_BIT(ah, AR_RTC_FORCE_WAKE,
 		    AR_RTC_FORCE_WAKE_EN);
 	if (AR_SREV_9100(ah))
@@ -2185,8 +2188,6 @@ bool ath9k_hw_setpower(struct ath_hw *ah, enum ath9k_power_mode mode)
 		"NETWORK SLEEP",
 		"UNDEFINED"
 	};
-
-	dump_stack();
 
 	if (ah->power_mode == mode) {
 		printk(KERN_INFO "!!! %s: already in that PS mode: %s \n", __func__, modes[mode]);
@@ -2280,14 +2281,7 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	u32 nextTbtt, beaconintval, dtimperiod, beacontimeout;
 	struct ath9k_hw_capabilities *pCap = &ah->caps;
 	struct ath_common *common = ath9k_hw_common(ah);
-
-	ENABLE_REGWRITE_BUFFER(ah);
-
-	REG_WRITE(ah, AR_NEXT_TBTT_TIMER, bs->bs_nexttbtt);
-	REG_WRITE(ah, AR_BEACON_PERIOD, bs->bs_intval);
-	REG_WRITE(ah, AR_DMA_BEACON_PERIOD, bs->bs_intval);
-
-	REGWRITE_BUFFER_FLUSH(ah);
+	u32 tsf, difference;
 
 	REG_RMW_FIELD(ah, AR_RSSI_THR,
 		      AR_RSSI_THR_BM_THR, bs->bs_bmissthreshold);
@@ -2306,15 +2300,45 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	else
 		nextTbtt = bs->bs_nexttbtt;
 
-	ath_dbg_common(common, BEACON, "next DTIM %d\n", bs->bs_nextdtim);
-	ath_dbg_common(common, BEACON, "next beacon %d\n", nextTbtt);
 	ath_dbg_common(common, BEACON, "beacon period %d\n", beaconintval);
 	ath_dbg_common(common, BEACON, "DTIM period %d\n", dtimperiod);
 
 	ENABLE_REGWRITE_BUFFER(ah);
 
-	REG_WRITE(ah, AR_NEXT_DTIM, bs->bs_nextdtim - SLEEP_SLOP);
-	REG_WRITE(ah, AR_NEXT_TIM, nextTbtt - SLEEP_SLOP);
+	tsf = (u32)ath9k_hw_gettsf64(ah);
+
+	if (ah->saved_next_dtim - SLEEP_SLOP <= tsf)
+		ah->saved_next_dtim = 0;
+
+	if (ah->saved_next_dtim) {
+		difference = ah->saved_next_dtim - SLEEP_SLOP - tsf;
+
+		/* estimate a delta time of ~10m between receiving a
+		 * beacon and arming the timer
+		 * TODO: does AR9271 have any register holding the TSF
+		 * of the last received beacon?
+		 */
+		if (difference > 10000) {
+			ah->saved_next_dtim -= 10000;
+			ah->saved_next_tbtt -= 10000;
+			difference -= 10000;
+		}
+		REG_WRITE(ah, AR_NEXT_DTIM, ah->saved_next_dtim - SLEEP_SLOP);
+		REG_WRITE(ah, AR_NEXT_TIM,  ah->saved_next_tbtt - SLEEP_SLOP);
+		REG_WRITE(ah, AR_NEXT_TBTT_TIMER, ah->saved_next_tbtt - SLEEP_SLOP);
+	}
+
+	if (!ah->saved_next_dtim)
+		printk(KERN_INFO "%s: saved_next_dtim = 0", __func__);
+	else {
+		printk(KERN_INFO "current  tsf: %u\n", tsf);
+		printk(KERN_INFO "next wake_up: %u\n", ah->saved_next_dtim - SLEEP_SLOP);
+		printk(KERN_INFO "__difference: %u\n", difference);
+	}
+
+	ah->saved_next_dtim = bs->bs_nextdtim;
+	ah->saved_next_tbtt = nextTbtt;
+	printk(KERN_INFO "saved_next_dtim: %u\n", ah->saved_next_dtim);
 
 	REG_WRITE(ah, AR_SLEEP1,
 		  SM((CAB_TIMEOUT_VAL << 3), AR_SLEEP1_CAB_TIMEOUT)
@@ -2328,8 +2352,13 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	REG_WRITE(ah, AR_SLEEP2,
 		  SM(beacontimeout, AR_SLEEP2_BEACON_TIMEOUT));
 
-	REG_WRITE(ah, AR_TIM_PERIOD, beaconintval);
-	REG_WRITE(ah, AR_DTIM_PERIOD, dtimperiod);
+	/* TODO: should we set the period given that we set the next timers
+	 * each time we receive a beacon?
+	 */
+	if (ah->saved_next_dtim) {
+		REG_WRITE(ah, AR_TIM_PERIOD, 1);
+		REG_WRITE(ah, AR_DTIM_PERIOD, 1);
+	}
 
 	REGWRITE_BUFFER_FLUSH(ah);
 

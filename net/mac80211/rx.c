@@ -3525,6 +3525,7 @@ static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 
 		rx.sta = sta_info_get_bss(prev, hdr->addr2);
 		rx.sdata = prev;
+		printk(KERN_INFO "!!! %s, sdata: %s, addr: %pM, seq: %d\n", __func__, prev->name, hdr->addr2, hdr->seq_ctrl);
 		ieee80211_prepare_and_rx_handle(&rx, skb, false);
 
 		prev = sdata;
@@ -3533,7 +3534,7 @@ static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 	if (prev) {
 		rx.sta = sta_info_get_bss(prev, hdr->addr2);
 		rx.sdata = prev;
-
+		printk(KERN_INFO "!!! if clause %s, sdata: %s, addr: %pM, seq: %d\n", __func__, prev->name, hdr->addr2, hdr->seq_ctrl);
 		if (ieee80211_prepare_and_rx_handle(&rx, skb, true))
 			return;
 	}

@@ -975,6 +975,9 @@ struct ath_hw {
 	bool tpc_enabled;
 	u8 tx_power[Ar5416RateSize];
 	u8 tx_power_stbc[Ar5416RateSize];
+
+	/* Power Save for the multiple-interface scenario */
+	u32 saved_next_dtim, saved_next_tbtt;
 };
 
 struct ath_bus_ops {

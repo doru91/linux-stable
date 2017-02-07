@@ -530,6 +530,7 @@ struct ath9k_htc_priv {
 #ifdef CONFIG_ATH9K_HTC_DEBUGFS
 	struct ath9k_debug debug;
 #endif
+
 	struct mutex mutex;
 	struct ieee80211_vif *csa_vif;
 };

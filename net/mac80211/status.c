@@ -699,10 +699,15 @@ void ieee80211_tx_status(struct ieee80211_hw *hw, struct sk_buff *skb)
 
 	tbl = rht_dereference_rcu(local->sta_hash.tbl, &local->sta_hash);
 
+	printk(KERN_INFO "!!! %s: addr1: %pM\n", __func__, hdr->addr1);
+	printk(KERN_INFO "!!! %s: addr2: %pM\n", __func__, hdr->addr2);
+
 	for_each_sta_info(local, tbl, hdr->addr1, sta, tmp) {
 		/* skip wrong virtual interface */
 		if (!ether_addr_equal(hdr->addr2, sta->sdata->vif.addr))
 			continue;
+
+		printk(KERN_INFO "%s. station name: %s\n", __func__, sta->sdata->name);
 
 		shift = ieee80211_vif_get_shift(&sta->sdata->vif);
 
@@ -854,12 +859,12 @@ void ieee80211_tx_status(struct ieee80211_hw *hw, struct sk_buff *skb)
 	    (local->ps_sdata1 || local->ps_sdata2) && !(local->scanning)) {
 		if (info->flags & IEEE80211_TX_STAT_ACK) {
 			if (local->ps_sdata1 && !strcmp(local->ps_sdata1->name, sta->sdata->name)) {
-				printk(KERN_INFO "!!! %s: ACK'ed NULL function for sdata1\n", __func__);
+				printk(KERN_INFO "%s: ACK'ed NULL function for sdata1: %s\n", __func__, sta->sdata->name);
 				local->ps_sdata1->u.mgd.flags |=
 					IEEE80211_STA_NULLFUNC_ACKED;
 			}
 			else if (local->ps_sdata2 && !strcmp(local->ps_sdata2->name, sta->sdata->name)) {
-				printk(KERN_INFO "!!! %s: ACK'ed NULL function for sdata2\n", __func__);
+				printk(KERN_INFO "%s: ACK'ed NULL function for sdata2: %s\n", __func__, sta->sdata->name);
 				local->ps_sdata2->u.mgd.flags |=
 					IEEE80211_STA_NULLFUNC_ACKED;
 			}
