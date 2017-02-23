@@ -2282,6 +2282,17 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	struct ath9k_hw_capabilities *pCap = &ah->caps;
 	struct ath_common *common = ath9k_hw_common(ah);
 	u32 tsf, difference;
+	u32 sleep_cnt, cycle_cnt, threshold = 0xFFFFFFFF / 2;
+
+	sleep_cnt = REG_READ(ah, AR_SLP_CNT);
+	cycle_cnt = REG_READ(ah, AR_SLP_CYCLE_CNT);
+	printk(KERN_INFO "%s. sleep_cnt: %u, cycle_cnt: %u\n",
+		__func__, sleep_cnt, cycle_cnt);
+
+	if (sleep_cnt > threshold || cycle_cnt > threshold) {
+		printk(KERN_INFO "%s: clear AR_SLP_MIB_CTRL\n", __func__);
+		REG_SET_BIT(ah, AR_SLP_MIB_CTRL, AR_SLP_MIB_CLEAR);
+	}
 
 	REG_RMW_FIELD(ah, AR_RSSI_THR,
 		      AR_RSSI_THR_BM_THR, bs->bs_bmissthreshold);
