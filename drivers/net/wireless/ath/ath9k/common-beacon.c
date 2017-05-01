@@ -61,11 +61,13 @@ static u32 ath9k_get_next_tbtt(struct ath_hw *ah, u64 tsf,
  */
 int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 				 struct ath_beacon_config *conf,
-				 struct ath9k_beacon_state *bs)
+				 struct ath9k_beacon_state *bs,
+				 int use_tsf_register)
 {
 	struct ath_common *common = ath9k_hw_common(ah);
 	int dtim_intval;
 	u64 tsf;
+	u32 last_tstp;
 
 	/* No need to configure beacon if we are not associated */
 	if (!test_bit(ATH_OP_PRIM_STA_VIF, &common->op_flags)) {
@@ -90,14 +92,28 @@ int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 	 * TSF and calculate dtim state for the result.
 	 */
 	tsf = ath9k_hw_gettsf64(ah);
-	conf->nexttbtt = ath9k_get_next_tbtt(ah, tsf, conf->intval);
+	last_tstp = REG_READ(ah, AR_LAST_TSTP);
+        printk(KERN_INFO "%s: TSF of last RX beacon: %u\n", __func__, last_tstp);
+	
+	if (last_tstp != ah->saved_last_tstp && use_tsf_register) {
+		printk(KERN_INFO "%s: Using last_tstp\n", __func__);
+		ah->saved_last_tstp = last_tstp;
+		conf->nexttbtt = ath9k_get_next_tbtt(ah, last_tstp, conf->intval);
+	} else {	
+		printk(KERN_INFO "%s: Using ath9k_hw_gettsf64\n", __func__);
+		conf->nexttbtt = ath9k_get_next_tbtt(ah, tsf, conf->intval);
+	}
 
 	bs->bs_intval = TU_TO_USEC(conf->intval);
 	bs->bs_dtimperiod = conf->dtim_period * bs->bs_intval;
 	bs->bs_nexttbtt = conf->nexttbtt;
 	bs->bs_nextdtim = conf->nexttbtt;
-	if (conf->dtim_period > 1)
-		bs->bs_nextdtim = ath9k_get_next_tbtt(ah, tsf, dtim_intval);
+	if (conf->dtim_period > 1) {
+		if (!use_tsf_register)
+			bs->bs_nextdtim = ath9k_get_next_tbtt(ah, tsf, dtim_intval);
+		else
+			bs->bs_nextdtim = ath9k_get_next_tbtt(ah, last_tstp, dtim_intval);
+	}
 
 	/*
 	 * Calculate the number of consecutive beacons to miss* before taking

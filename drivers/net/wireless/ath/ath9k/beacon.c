@@ -475,7 +475,7 @@ static void ath9k_beacon_config_sta(struct ath_hw *ah,
 {
 	struct ath9k_beacon_state bs;
 
-	if (ath9k_cmn_beacon_config_sta(ah, conf, &bs) == -EPERM)
+	if (ath9k_cmn_beacon_config_sta(ah, conf, &bs, 0) == -EPERM)
 		return;
 
 	ath9k_hw_disable_interrupts(ah);

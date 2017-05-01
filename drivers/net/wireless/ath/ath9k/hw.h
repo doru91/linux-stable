@@ -977,7 +977,7 @@ struct ath_hw {
 	u8 tx_power_stbc[Ar5416RateSize];
 
 	/* Power Save for the multiple-interface scenario */
-	u32 saved_next_dtim, saved_next_tbtt;
+	u32 saved_next_dtim, saved_next_tbtt, saved_last_tstp;
 };
 
 struct ath_bus_ops {

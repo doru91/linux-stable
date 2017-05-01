@@ -2324,11 +2324,12 @@ void ath9k_hw_set_sta_beacon_timers(struct ath_hw *ah,
 	if (ah->saved_next_dtim) {
 		difference = ah->saved_next_dtim - SLEEP_SLOP - tsf;
 
-		/* estimate a delta time of ~10m between receiving a
+		/* estimate a delta time of ~10ms between receiving a
 		 * beacon and arming the timer
 		 * TODO: does AR9271 have any register holding the TSF
 		 * of the last received beacon?
 		 */
+
 		if (difference > 10000) {
 			ah->saved_next_dtim -= 10000;
 			ah->saved_next_tbtt -= 10000;

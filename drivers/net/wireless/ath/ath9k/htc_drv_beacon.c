@@ -90,16 +90,32 @@ static void ath9k_htc_beacon_init(struct ath9k_htc_priv *priv,
 }
 
 static void ath9k_htc_beacon_config_sta(struct ath9k_htc_priv *priv,
-					struct ath_beacon_config *bss_conf)
+					struct ath_beacon_config *bss_conf,
+					struct ieee80211_vif *vif)
 {
 	struct ath9k_beacon_state bs;
 	enum ath9k_int imask = 0;
 	__be32 htc_imask = 0;
 	int ret __attribute__ ((unused));
 	u8 cmd_rsp;
+	int use_tsf_register = 0;
 	printk(KERN_INFO "%s\n", __func__);
 
-	if (ath9k_cmn_beacon_config_sta(priv->ah, bss_conf, &bs) == -EPERM)
+	if (!vif)
+		printk(KERN_INFO "vif is NULL\n");
+	
+	if (vif) {
+		if (vif->addr[ETH_ALEN - 1] == 0x39) {
+			printk(KERN_INFO "39 interface\n");
+			use_tsf_register = 1;
+		}
+		else if (vif->addr[ETH_ALEN - 1] == 0x40)
+			printk(KERN_INFO "40 interface\n");
+		else
+			printk(KERN_INFO "Unknown interface: %x\n", priv->csa_vif->addr[ETH_ALEN - 1]);
+	}
+
+	if (ath9k_cmn_beacon_config_sta(priv->ah, bss_conf, &bs, use_tsf_register) == -EPERM)
 		return;
 
 	WMI_CMD(WMI_DISABLE_INTR_CMDID);
@@ -471,7 +487,7 @@ void ath9k_htc_beacon_config(struct ath9k_htc_priv *priv,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_STATION:
-		ath9k_htc_beacon_config_sta(priv, cur_conf);
+		ath9k_htc_beacon_config_sta(priv, cur_conf, vif);
 		avp->beacon_configured = true;
 		break;
 	case NL80211_IFTYPE_ADHOC:
@@ -494,7 +510,7 @@ void ath9k_htc_beacon_reconfig(struct ath9k_htc_priv *priv)
 
 	switch (priv->ah->opmode) {
 	case NL80211_IFTYPE_STATION:
-		ath9k_htc_beacon_config_sta(priv, cur_conf);
+		ath9k_htc_beacon_config_sta(priv, cur_conf, NULL);
 		break;
 	case NL80211_IFTYPE_ADHOC:
 		ath9k_htc_beacon_config_adhoc(priv, cur_conf);
