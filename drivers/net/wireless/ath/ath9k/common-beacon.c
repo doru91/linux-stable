@@ -137,7 +137,7 @@ int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 	 * DTIM count = 2 for both APs.
 	 */
 
-	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(200),
+	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(dtim_intval),
 						  conf->intval));
 	if (bs->bs_sleepduration > bs->bs_dtimperiod)
 		bs->bs_sleepduration = bs->bs_dtimperiod;

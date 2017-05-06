@@ -1583,7 +1583,7 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 			    latency != (2000 * USEC_PER_SEC))
 				timeout = 0;
 			else
-				timeout = 100;
+				timeout = 10;
 		}
 		local->hw.conf.dynamic_ps_timeout = timeout;
 
