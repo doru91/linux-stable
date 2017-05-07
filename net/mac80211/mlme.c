@@ -1583,7 +1583,7 @@ void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency)
 			    latency != (2000 * USEC_PER_SEC))
 				timeout = 0;
 			else
-				timeout = 100;
+				timeout = 10;
 		}
 		local->hw.conf.dynamic_ps_timeout = timeout;
 
@@ -3408,7 +3408,7 @@ static void ieee80211_rx_mgmt_probe_resp(struct ieee80211_sub_if_data *sdata,
  * will not be able to tell whether the hardware supports it or not.
  *
  * XXX: This list needs to be dynamic -- userspace needs to be able to
- *	add items it requires. It also needs to be able to tell us to
+ *	add items it requires. It also needs to be able to tell us treco
  *	look out for other vendor IEs.
  */
 static const u64 care_about_ies =
@@ -3585,8 +3585,7 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 		bool directed_tim = ieee80211_check_tim(elems.tim,
 							elems.tim_len,
 							ifmgd->aid);
-		if (directed_tim) {
-
+		if (!strcmp(sdata->name, "wlan4")) {
 			/* debug info */
 			printk(KERN_INFO "!!! %s: directed tim\n", __func__);
 

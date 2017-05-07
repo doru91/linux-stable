@@ -111,7 +111,7 @@ int ath9k_cmn_beacon_config_sta(struct ath_hw *ah,
 	 * XXX fixed at 100ms
 	 */
 
-	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(100),
+	bs->bs_sleepduration = TU_TO_USEC(roundup(IEEE80211_MS_TO_TU(200),
 						  conf->intval));
 	if (bs->bs_sleepduration > bs->bs_dtimperiod)
 		bs->bs_sleepduration = bs->bs_dtimperiod;

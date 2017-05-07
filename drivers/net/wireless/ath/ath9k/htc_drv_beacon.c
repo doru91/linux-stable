@@ -424,9 +424,19 @@ static bool ath9k_htc_check_beacon_config(struct ath9k_htc_priv *priv,
 			"HW in AP mode, cannot set STA beacon parameters\n");
 		return false;
 	}
-
-	/*
-	 * The beacon parameters are configured only for the first
+       
+	if (vif) {
+		if (vif->addr[ETH_ALEN - 1] == 0x39) {
+			printk(KERN_INFO "39 interface\n");
+		}
+		else if (vif->addr[ETH_ALEN - 1] == 0x40) {
+			printk(KERN_INFO "40 interface\n");
+			return false;
+		}
+		else
+			printk(KERN_INFO "Unknown interface: \n");
+	}
+	/* The beacon parameters are configured only for the first
 	 * station interface.
 	 */
 	if ((priv->ah->opmode == NL80211_IFTYPE_STATION) &&
@@ -437,11 +447,11 @@ static bool ath9k_htc_check_beacon_config(struct ath9k_htc_priv *priv,
 			priv->hw, IEEE80211_IFACE_ITER_RESUME_ALL,
 			ath9k_htc_beacon_iter, &beacon_configured);
 
-		if (beacon_configured) {
+		/*if (beacon_configured) {
 			ath_dbg(common, CONFIG,
 				"Beacon already configured for a station interface\n");
 			return false;
-		}
+		}*/
 	}
 
 	return true;

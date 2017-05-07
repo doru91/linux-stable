@@ -857,11 +857,16 @@ void ieee80211_tx_status(struct ieee80211_hw *hw, struct sk_buff *skb)
 				printk(KERN_INFO "!!! %s: ACK'ed NULL function for sdata1\n", __func__);
 				local->ps_sdata1->u.mgd.flags |=
 					IEEE80211_STA_NULLFUNC_ACKED;
+				local->ps_sdata2->u.mgd.flags |=
+					IEEE80211_STA_NULLFUNC_ACKED;
 			}
 			else if (local->ps_sdata2 && !strcmp(local->ps_sdata2->name, sta->sdata->name)) {
 				printk(KERN_INFO "!!! %s: ACK'ed NULL function for sdata2\n", __func__);
 				local->ps_sdata2->u.mgd.flags |=
-					IEEE80211_STA_NULLFUNC_ACKED;
+					IEEE80211_STA_NULLFUNC_ACKED;	
+				local->ps_sdata1->u.mgd.flags |=
+                                        IEEE80211_STA_NULLFUNC_ACKED;
+
 			}
 			else
 				printk(KERN_INFO "!!! %s: something is wrong\n", __func__);
